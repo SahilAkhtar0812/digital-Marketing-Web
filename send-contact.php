@@ -2,16 +2,63 @@
 
 use PHPMailer\PHPMailer\PHPMailer;
 use PHPMailer\PHPMailer\Exception;
+use Dotenv\Dotenv;
+
+
+/* =====================================================
+   COMPOSER
+===================================================== */
 
 require __DIR__ . '/vendor/autoload.php';
 
 
 /* =====================================================
-   ONLY ALLOW POST REQUEST
+   LOAD .ENV
+===================================================== */
+
+$dotenv = Dotenv::createImmutable(__DIR__);
+$dotenv->safeLoad();
+
+
+/* =====================================================
+   CHECK ENV SETTINGS
+===================================================== */
+
+$requiredEnv = [
+    'MAIL_HOST',
+    'MAIL_PORT',
+    'MAIL_USERNAME',
+    'MAIL_PASSWORD',
+    'MAIL_FROM_ADDRESS',
+    'MAIL_FROM_NAME',
+    'CONTACT_EMAIL'
+];
+
+foreach ($requiredEnv as $key) {
+
+    if (empty($_ENV[$key])) {
+
+        error_log("Missing .env value: {$key}");
+
+        header(
+            'Location: /website/contact.php?status=error'
+        );
+
+        exit;
+    }
+}
+
+
+/* =====================================================
+   POST REQUEST ONLY
 ===================================================== */
 
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
-    header('Location: /website/contact.php');
+
+    header(
+        'Location: /website/contact.php'
+    );
+
     exit;
 }
 
@@ -21,7 +68,11 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
 ===================================================== */
 
 if (!empty($_POST['website'] ?? '')) {
-    header('Location: /website/contact.php?status=success');
+
+    header(
+        'Location: /website/contact.php?status=success'
+    );
+
     exit;
 }
 
@@ -31,16 +82,22 @@ if (!empty($_POST['website'] ?? '')) {
 ===================================================== */
 
 $name = trim($_POST['name'] ?? '');
+
 $email = trim($_POST['email'] ?? '');
+
 $phone = trim($_POST['phone'] ?? '');
+
 $company = trim($_POST['company'] ?? '');
+
 $service = trim($_POST['service'] ?? '');
+
 $budget = trim($_POST['budget'] ?? '');
+
 $message = trim($_POST['message'] ?? '');
 
 
 /* =====================================================
-   VALIDATION
+   REQUIRED VALIDATION
 ===================================================== */
 
 if (
@@ -50,16 +107,32 @@ if (
     $service === '' ||
     $message === ''
 ) {
-    header('Location: /website/contact.php?status=error');
+
+    header(
+        'Location: /website/contact.php?status=error'
+    );
+
     exit;
 }
 
+
+/* =====================================================
+   EMAIL VALIDATION
+===================================================== */
 
 if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
-    header('Location: /website/contact.php?status=error');
+
+    header(
+        'Location: /website/contact.php?status=error'
+    );
+
     exit;
 }
 
+
+/* =====================================================
+   LENGTH VALIDATION
+===================================================== */
 
 if (
     strlen($name) > 100 ||
@@ -70,37 +143,45 @@ if (
     strlen($budget) > 100 ||
     strlen($message) > 2000
 ) {
-    header('Location: /website/contact.php?status=error');
+
+    header(
+        'Location: /website/contact.php?status=error'
+    );
+
     exit;
 }
 
 
 /* =====================================================
-   WHATSAPP NUMBER
+   CUSTOMER WHATSAPP NUMBER
 ===================================================== */
 
-$phoneDigits = preg_replace('/\D/', '', $phone);
+$phoneDigits =
+    preg_replace('/\D/', '', $phone);
 
 
 if (strlen($phoneDigits) === 10) {
 
-    $customerWhatsApp = '91' . $phoneDigits;
+    $customerWhatsApp =
+        '91' . $phoneDigits;
 
 } elseif (
     strlen($phoneDigits) === 12 &&
     str_starts_with($phoneDigits, '91')
 ) {
 
-    $customerWhatsApp = $phoneDigits;
+    $customerWhatsApp =
+        $phoneDigits;
 
 } else {
 
-    $customerWhatsApp = $phoneDigits;
+    $customerWhatsApp =
+        $phoneDigits;
 }
 
 
 /* =====================================================
-   ESCAPE USER DATA
+   ESCAPE DATA
 ===================================================== */
 
 $safeName = htmlspecialchars(
@@ -157,70 +238,55 @@ $mail = new PHPMailer(true);
 
 try {
 
-    /* Gmail SMTP */
+
+    /* =================================================
+       SMTP
+    ================================================= */
 
     $mail->isSMTP();
 
-    $mail->Host = 'smtp.gmail.com';
+    $mail->Host =
+        $_ENV['MAIL_HOST'];
 
-    $mail->SMTPAuth = true;
+    $mail->SMTPAuth =
+        true;
 
+    $mail->Username =
+        $_ENV['MAIL_USERNAME'];
 
-    /* ===============================================
-       YOUR NEW GMAIL ACCOUNT
-    =============================================== */
-
-    $mail->Username = 'akhtarsahil0812@gmail.com';
-
-
-    /*
-       IMPORTANT:
-
-       Generate a NEW Google App Password from:
-
-       akhtarsahil@gmail.com
-
-       Google will show:
-
-       xxxx xxxx xxxx xxxx
-
-       Remove the spaces and paste it below.
-
-       DO NOT send the new password here.
-    */
-
-    $mail->Password = 'saphzxkzzlkaasue'; 
-
+    $mail->Password =
+        $_ENV['MAIL_PASSWORD'];
 
     $mail->SMTPSecure =
         PHPMailer::ENCRYPTION_STARTTLS;
 
-    $mail->Port = 587;
+    $mail->Port =
+        (int) $_ENV['MAIL_PORT'];
 
 
-    /* ===============================================
+    /* =================================================
        FROM
-    =============================================== */
+    ================================================= */
 
     $mail->setFrom(
-        'akhtarsahil@gmail.com',
-        'SD Media Tech Website'
+        $_ENV['MAIL_FROM_ADDRESS'],
+        $_ENV['MAIL_FROM_NAME']
     );
 
 
-    /* ===============================================
-       RECEIVE ENQUIRIES HERE
-    =============================================== */
+    /* =================================================
+       RECEIVE ENQUIRY
+    ================================================= */
 
     $mail->addAddress(
-        'akhtarsahil@gmail.com',
+        $_ENV['CONTACT_EMAIL'],
         'SD Media Tech'
     );
 
 
-    /* ===============================================
+    /* =================================================
        REPLY TO CUSTOMER
-    =============================================== */
+    ================================================= */
 
     $mail->addReplyTo(
         $email,
@@ -228,21 +294,22 @@ try {
     );
 
 
-    /* ===============================================
+    /* =================================================
        EMAIL SETTINGS
-    =============================================== */
+    ================================================= */
 
     $mail->isHTML(true);
 
-    $mail->CharSet = 'UTF-8';
+    $mail->CharSet =
+        'UTF-8';
 
     $mail->Subject =
         'New Website Enquiry - ' . $service;
 
 
-    /* ===============================================
-       EMAIL TEMPLATE
-    =============================================== */
+    /* =================================================
+       HTML EMAIL
+    ================================================= */
 
     $mail->Body = '
 
@@ -263,6 +330,8 @@ try {
         ">
 
 
+            <!-- HEADER -->
+
             <div style="
                 background:#111827;
                 color:#ffffff;
@@ -270,9 +339,9 @@ try {
             ">
 
                 <div style="
-                    font-size:11px;
+                    color:#8b5cf6;
+                    font-size:12px;
                     letter-spacing:1.5px;
-                    color:#a78bfa;
                     font-weight:bold;
                     margin-bottom:8px;
                 ">
@@ -293,11 +362,13 @@ try {
                     color:#cbd5e1;
                     font-size:13px;
                 ">
-                    A new customer submitted your contact form.
+                    A potential customer submitted your website form.
                 </p>
 
             </div>
 
+
+            <!-- DETAILS -->
 
             <div style="padding:28px;">
 
@@ -310,6 +381,7 @@ try {
                         border-collapse:collapse;
                     "
                 >
+
 
                     <tr>
 
@@ -336,17 +408,7 @@ try {
                         </td>
 
                         <td>
-
-                            <a
-                                href="mailto:' . $safeEmail . '"
-                                style="
-                                    color:#6f5cff;
-                                    text-decoration:none;
-                                "
-                            >
-                                ' . $safeEmail . '
-                            </a>
-
+                            ' . $safeEmail . '
                         </td>
 
                     </tr>
@@ -408,6 +470,8 @@ try {
                 </table>
 
 
+                <!-- MESSAGE -->
+
                 <div style="
                     margin-top:22px;
                     padding:20px;
@@ -425,11 +489,15 @@ try {
                         line-height:1.7;
                         color:#475569;
                     ">
+
                         ' . $safeMessage . '
+
                     </div>
 
                 </div>
 
+
+                <!-- ACTION BUTTONS -->
 
                 <div style="
                     margin-top:25px;
@@ -474,6 +542,8 @@ try {
             </div>
 
 
+            <!-- FOOTER -->
+
             <div style="
                 padding:18px 28px;
                 background:#f8fafc;
@@ -492,9 +562,9 @@ try {
     ';
 
 
-    /* ===============================================
-       PLAIN TEXT EMAIL
-    =============================================== */
+    /* =================================================
+       TEXT FALLBACK
+    ================================================= */
 
     $mail->AltBody =
 
@@ -521,12 +591,16 @@ try {
         $message;
 
 
-    /* ===============================================
+    /* =================================================
        SEND
-    =============================================== */
+    ================================================= */
 
     $mail->send();
 
+
+    /* =================================================
+       SUCCESS
+    ================================================= */
 
     header(
         'Location: /website/contact.php?status=success'
@@ -538,11 +612,19 @@ try {
 } catch (Exception $e) {
 
 
+    /* =================================================
+       LOG REAL ERROR
+    ================================================= */
+
     error_log(
         'SD Media Tech PHPMailer Error: ' .
         $mail->ErrorInfo
     );
 
+
+    /* =================================================
+       REDIRECT
+    ================================================= */
 
     header(
         'Location: /website/contact.php?status=error'
